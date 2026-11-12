@@ -1,7 +1,7 @@
 // The Ask pane: questions about the video, answered by Claude or OpenAI with
 // the transcript as context. Opened from the sparkle icon in the panel's top bar,
 // or from "Ask about this" on a transcript line or a time note.
-import { AI_KEY, activeAI, buildSystem, getAI, questionText, streamAnswer } from '../shared/ai.js';
+import { AI_KEY, PROVIDERS, activeAI, buildSystem, getAI, hasAccess, questionText, streamAnswer } from '../shared/ai.js';
 import { createAISetup } from '../shared/aisetup.js';
 import { renderMarkdown } from '../shared/md.js';
 import { copyText, formatTime, h } from '../shared/util.js';
@@ -21,6 +21,7 @@ export function createAsk(api) {
   const A = {
     open: false,
     ai: null, // active provider/model/key or null
+    access: false, // Chrome has granted the provider's host
     chat: [],
     scope: { kind: 'video' },
     busy: null, // AbortController while answering
@@ -54,6 +55,7 @@ export function createAsk(api) {
   // ---------- setup / provider
   async function refreshAI() {
     A.ai = activeAI(await getAI());
+    A.access = A.ai ? await hasAccess(A.ai.provider) : false;
     title.textContent = A.ai ? `Ask ${A.ai.name}` : 'Ask about this video';
     model.textContent = A.ai ? A.ai.modelLabel : '';
     api.onProviderChange && api.onProviderChange(A.ai);
@@ -62,6 +64,9 @@ export function createAsk(api) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes[AI_KEY]) refreshAI();
   });
+  // access can also be changed from chrome://extensions
+  chrome.permissions.onAdded.addListener(() => refreshAI());
+  chrome.permissions.onRemoved.addListener(() => refreshAI());
 
   async function showSetup(on) {
     A.settingUp = on;
@@ -70,7 +75,9 @@ export function createAsk(api) {
         h(
           'div',
           { class: 'ask-intro' },
-          A.ai
+          A.ai && !A.access
+            ? h('p', null, `Ask needs your permission to reach ${PROVIDERS[A.ai.provider].company}. Click Save, then choose Allow when Chrome asks.`)
+            : A.ai
             ? h('h2', null, 'Model and API key')
             : h('p', null, 'Connect your own Claude or OpenAI API key. Answers use the video’s transcript and your time notes, and cite moments you can click to jump to.')
         ),
@@ -134,13 +141,13 @@ export function createAsk(api) {
 
   // ---------- rendering
   function render() {
-    const ready = !!A.ai && !A.settingUp;
+    const ready = !!A.ai && A.access && !A.settingUp;
     setupHost.hidden = ready;
     msgs.hidden = !ready;
     foot.hidden = !ready;
     suggest.hidden = !ready || A.chat.length > 0;
     moreBtn.hidden = !A.ai;
-    if (!A.ai && !A.settingUp && A.open) {
+    if ((!A.ai || !A.access) && !A.settingUp && A.open) {
       showSetup(true);
       return;
     }

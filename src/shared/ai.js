@@ -40,6 +40,35 @@ export const ENDPOINTS = {
   openai: 'https://api.openai.com',
 };
 
+// Ask's hosts are optional permissions: Chrome asks the person when they connect a key,
+// so installing Lectern only needs access to youtube.com.
+const ORIGINS = {
+  anthropic: 'https://api.anthropic.com/*',
+  openai: 'https://api.openai.com/*',
+};
+
+/** Ask Chrome for access to a provider's API. Call it straight from a click, before any await. */
+export function requestAccess(provider) {
+  return chrome.permissions.request({ origins: [ORIGINS[provider]] }).catch(() => false);
+}
+
+export function hasAccess(provider) {
+  return chrome.permissions.contains({ origins: [ORIGINS[provider]] }).catch(() => false);
+}
+
+/** Give access back once no key needs it. */
+export function releaseAccess(providers = Object.keys(ORIGINS)) {
+  return chrome.permissions.remove({ origins: providers.map((p) => ORIGINS[p]) }).catch(() => false);
+}
+
+async function assertAccess(provider) {
+  if (!(await hasAccess(provider))) {
+    throw new AIError(`Lectern needs your permission to reach ${PROVIDERS[provider].company}. Open Ask settings and click Save to allow it.`, {
+      kind: 'access',
+    });
+  }
+}
+
 export async function getAI() {
   const r = await chrome.storage.local.get(AI_KEY);
   const ai = r[AI_KEY] || {};
@@ -114,6 +143,7 @@ function friendlyError(provider, status, body) {
 
 /** Check a key with a request that costs nothing (listing models). */
 export async function testKey(provider, key) {
+  await assertAccess(provider);
   let res;
   try {
     res = await fetch(`${ENDPOINTS[provider]}/v1/models`, { headers: headersFor(provider, key) });
@@ -169,6 +199,7 @@ export async function streamAnswer({ provider, key, model, system, messages, sig
     url = `${ENDPOINTS.openai}/v1/chat/completions`;
     body = { model, stream: true, messages: [{ role: 'system', content: system }, ...messages] };
   }
+  await assertAccess(provider);
   let res;
   try {
     res = await fetch(url, { method: 'POST', headers: headersFor(provider, key), body: JSON.stringify(body), signal });

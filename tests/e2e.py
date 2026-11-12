@@ -6,41 +6,13 @@ Needs Playwright (`pip install playwright && playwright install chromium`) and p
 listen on 127.0.0.1:443. The mock server is started automatically if it isn't already running.
 Screenshots land in tests/.out/shots.
 """
-import atexit, json, os, re, shutil, socket, subprocess, sys, time, traceback
+import json, os, re, shutil, sys, time, traceback
 from playwright.sync_api import sync_playwright
+from harness import EXT, OUT, build_test_ext, ensure_mock_server, launch
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-EXT = os.path.dirname(HERE)
-OUT = os.path.join(HERE, ".out")
 SHOTS = os.path.join(OUT, "shots")
 PROFILE = os.path.join(OUT, "profile")
-shutil.rmtree(PROFILE, ignore_errors=True)
 os.makedirs(SHOTS, exist_ok=True)
-
-
-def port_open():
-    try:
-        with socket.create_connection(("127.0.0.1", 443), timeout=0.5):
-            return True
-    except OSError:
-        return False
-
-
-def ensure_mock_server():
-    if port_open():
-        return
-    log = open(os.path.join(OUT, "server.log"), "w")
-    proc = subprocess.Popen([sys.executable, os.path.join(HERE, "mock", "server.py")], stdout=log, stderr=subprocess.STDOUT)
-    atexit.register(proc.terminate)
-    for _ in range(50):
-        if port_open():
-            return
-        if proc.poll() is not None:
-            break
-        time.sleep(0.2)
-    log.close()
-    sys.exit("Mock server didn't start. See tests/.out/server.log (it needs to listen on port 443).")
-
 
 ensure_mock_server()
 
@@ -72,21 +44,41 @@ def wait_until(fn, timeout=10, step=0.2):
     return last if last and not isinstance(last, Exception) else None
 
 
+def real_manifest_checks(p):
+    ctx = launch(p, EXT, os.path.join(OUT, "profile-real"))
+    try:
+        sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
+        base = f"chrome-extension://{sw.url.split('/')[2]}"
+        m = sw.evaluate("chrome.runtime.getManifest()")
+        check("installs with access to youtube.com only", m["host_permissions"] == ["https://www.youtube.com/*"], json.dumps(m["host_permissions"]))
+        check("Ask's hosts are optional", sorted(m.get("optional_host_permissions", [])) == ["https://api.anthropic.com/*", "https://api.openai.com/*"])
+        granted = sw.evaluate("chrome.permissions.contains({origins: ['https://api.anthropic.com/*']})")
+        check("no access to Anthropic until a key is connected", granted is False)
+        # a key saved without access (e.g. access removed in chrome://extensions): Ask asks for it
+        sw.evaluate("chrome.storage.local.set({ai: {provider: 'anthropic', keys: {anthropic: 'sk-ant-good-key-1234'}, models: {}}})")
+        yt = ctx.new_page()
+        yt.goto("https://www.youtube.com/watch?v=AAAAAAAAAAA")
+        tab = sw.evaluate("chrome.tabs.query({url: 'https://www.youtube.com/watch?v=AAAAAAAAAAA'}).then(t => t[0].id)")
+        panel = ctx.new_page()
+        panel.set_viewport_size({"width": 400, "height": 900})
+        watch_console(panel, "panel-real")
+        panel.goto(f"{base}/src/sidepanel/sidepanel.html?tab={tab}")
+        panel.wait_for_selector(".video-view:not([hidden])")
+        panel.click(".ask-btn")
+        ok = wait_until(lambda: "needs your permission to reach Anthropic" in panel.inner_text(".ask-pane"), 5)
+        check("Ask asks for permission when a key is saved without access", ok, panel.inner_text(".ask-pane")[:200])
+        check("questions stay hidden until access is allowed", not panel.locator(".ask-foot").is_visible())
+    except Exception:
+        traceback.print_exc()
+        results.append(("real manifest checks crashed", False, traceback.format_exc()[-400:]))
+    finally:
+        ctx.close()
+
+
+TEST_EXT = build_test_ext()
+
 with sync_playwright() as p:
-    ctx = p.chromium.launch_persistent_context(
-        PROFILE,
-        channel="chromium",
-        headless=True,
-        viewport={"width": 1280, "height": 860},
-        args=[
-            f"--disable-extensions-except={EXT}",
-            f"--load-extension={EXT}",
-            "--host-resolver-rules=MAP www.youtube.com 127.0.0.1, MAP i.ytimg.com 127.0.0.1, MAP api.anthropic.com 127.0.0.1, MAP api.openai.com 127.0.0.1",
-            "--ignore-certificate-errors",
-            "--no-proxy-server",
-            "--autoplay-policy=no-user-gesture-required",
-        ],
-    )
+    ctx = launch(p, TEST_EXT, PROFILE)
     try:
         sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
         ext_id = sw.url.split("/")[2]
@@ -762,6 +754,8 @@ with sync_playwright() as p:
         for e in errors:
             print("  ", e)
         ctx.close()
+
+    real_manifest_checks(p)
 
 passed = sum(1 for r in results if r[1])
 print(f"\n{passed}/{len(results)} checks passed")

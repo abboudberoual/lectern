@@ -76,7 +76,7 @@ Everything is stored in Chrome on your computer. Nothing is sent anywhere except
 ## Permissions
 
 - **Read and change data on youtube.com**: to read the video time, jump to timestamps, add the note button and read captions.
-- **api.anthropic.com and api.openai.com**: used only by Ask, and only with a key you've added.
+- **api.anthropic.com or api.openai.com**: not asked for at install. Chrome asks when you connect a key for Ask, and access is given back when you remove the key.
 - **Side panel, storage, scripting, context menu**: the notes panel, saving your notes, transcript capture and the "Open library" menu item.
 
 ## Contributing

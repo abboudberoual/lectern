@@ -5,10 +5,17 @@ Copy for the store dashboard. Keep "YouTube" out of the name: YouTube's branding
 ## Before submitting
 
 - [ ] A week or two of everyday use on real YouTube, with a real Claude key and a real OpenAI key. Try Shorts, live streams, 2-hour-plus videos, non-English and auto-generated captions, videos with ads, and being signed out.
-- [ ] New icon without a play triangle (too close to YouTube's mark).
-- [ ] Remove `https://i.ytimg.com/*` from `host_permissions` (thumbnails load without it), and move the Anthropic and OpenAI hosts to `optional_host_permissions`, requested when someone clicks Connect.
-- [ ] Screenshots at exactly 1280×800 (`docs/screenshots/library.png` is 2× that; scale it down), plus a 440×280 promo tile.
 - [ ] Developer account: one-time $5 fee, and the EU trader/non-trader declaration.
+- [ ] Bump the version if anything changed during testing, then push a tag (`git tag v1.0.0 && git push --tags`). The Release workflow attaches `lectern-<version>.zip`: that's the file to upload.
+- [x] Icon without a play triangle (`scripts/make_icons.py`).
+- [x] Install asks for youtube.com only; the Anthropic and OpenAI hosts are optional and requested when someone connects a key.
+- [x] Screenshots and promo tile in `docs/store/` (regenerate with `python3 tests/screenshots.py`).
+
+## Images
+
+- Store icon: `icons/icon128.png` (96 px artwork with 16 px transparent padding, as the store asks)
+- Screenshots, 1280×800, in this order: `docs/store/1-notes.png`, `2-folders.png`, `3-ask.png`, `4-transcript.png`, `5-search.png`
+- Small promo tile, 440×280: `docs/store/promo-440x280.png`
 
 ## Name
 
@@ -59,7 +66,7 @@ Lectern is not affiliated with YouTube, Google, Anthropic or OpenAI.
 - `scripting`: injects the transcript reader into the YouTube tab when the user saves a video or clicks Get transcript, and into YouTube tabs already open when the extension is installed.
 - `contextMenus`: the "Open library" item on the toolbar icon's menu.
 - Host `https://www.youtube.com/*`: reads the current video time, jumps to timestamps, adds a note button to the player, and reads captions.
-- Hosts `https://api.anthropic.com/*`, `https://api.openai.com/*`: used only by the optional Ask feature, with the user's own API key, to send their question with the video's transcript and their notes.
+- Optional hosts `https://api.anthropic.com/*`, `https://api.openai.com/*`: not granted at install. Requested only when the user connects their own API key for the optional Ask feature, to send their question with the video's transcript and their notes. Released when they remove the key.
 
 **Remote code:** No. All code is in the package.
 

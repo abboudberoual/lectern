@@ -1,5 +1,5 @@
 // Connect / change the model used by Ask. Shared by the side panel and the library's settings.
-import { PROVIDERS, activeAI, disconnectAI, getAI, maskKey, saveAI, testKey } from './ai.js';
+import { PROVIDERS, activeAI, disconnectAI, getAI, maskKey, releaseAccess, requestAccess, saveAI, testKey } from './ai.js';
 import { h } from './util.js';
 import { icon, showToast } from './ui.js';
 
@@ -88,10 +88,17 @@ export async function createAISetup({ onDone, onDisconnect, compact = false } = 
       keyInput.focus();
       return;
     }
+    // Chrome only shows its permission prompt in response to a click, so ask before any await
+    const access = requestAccess(provider);
     connect.disabled = true;
     status.classList.remove('error');
     status.replaceChildren(h('span', { class: 'spinner', 'aria-hidden': 'true' }), ' Checking the key…');
     try {
+      if (!(await access)) {
+        status.textContent = `Ask needs your permission to reach ${PROVIDERS[provider].company}. Click ${connect.textContent} again and choose Allow.`;
+        status.classList.add('error');
+        return;
+      }
       if (typed || provider !== ai.provider) await testKey(provider, key);
       const next = await saveAI({ provider, keys: { [provider]: key }, models: { [provider]: modelSel.value } });
       Object.assign(ai, next);
@@ -108,6 +115,7 @@ export async function createAISetup({ onDone, onDisconnect, compact = false } = 
 
   remove.addEventListener('click', async () => {
     await disconnectAI();
+    await releaseAccess();
     ai.keys = {};
     ai.provider = null;
     drawProvider();

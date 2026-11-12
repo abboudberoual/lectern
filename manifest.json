@@ -33,8 +33,9 @@
     "contextMenus"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*",
-    "https://i.ytimg.com/*",
+    "https://www.youtube.com/*"
+  ],
+  "optional_host_permissions": [
     "https://api.anthropic.com/*",
     "https://api.openai.com/*"
   ],

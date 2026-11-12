@@ -24,7 +24,9 @@ The mock listens on `127.0.0.1:443`, so on Linux either run as root or allow low
 sudo sysctl -w net.ipv4.ip_unprivileged_port_start=0
 ```
 
-Screenshots from each run land in `tests/.out/shots`. `python3 tests/screenshots.py` regenerates the README images in `docs/screenshots`.
+Screenshots from each run land in `tests/.out/shots`. `python3 tests/screenshots.py` regenerates the README images in `docs/screenshots` and the store screenshots and promo tile in `docs/store`. `python3 scripts/make_icons.py` redraws the icons.
+
+Ask's hosts are optional permissions, and headless Chromium can't answer Chrome's permission prompt, so the suite runs on a copy of the extension with those hosts pre-granted (`tests/harness.py`), then checks the real manifest separately.
 
 ## When transcript capture breaks
 
