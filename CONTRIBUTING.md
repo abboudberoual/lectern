@@ -50,7 +50,7 @@ That's usually YouTube changing its page. The code is in `src/transcript.js`, wh
 ## Release
 
 1. Bump `version` in `manifest.json` (and `package.json`).
-2. Commit, then tag and push: `git tag v1.0.1 && git push --tags`.
+2. Commit, then publish a release for the new version: on GitHub, **Releases → Draft a new release**, type a new tag like `v1.0.1`, and publish. (Or from a clone: `git tag v1.0.1 && git push origin v1.0.1`.)
 3. The Release workflow builds `lectern-<version>.zip` and attaches it to a GitHub release. That zip is what you upload to the Chrome Web Store.
 
 `python3 scripts/package.py` builds the same zip locally, in `dist/`.

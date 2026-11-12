@@ -6,7 +6,7 @@ Copy for the store dashboard. Keep "YouTube" out of the name: YouTube's branding
 
 - [ ] A week or two of everyday use on real YouTube, with a real Claude key and a real OpenAI key. Try Shorts, live streams, 2-hour-plus videos, non-English and auto-generated captions, videos with ads, and being signed out.
 - [ ] Developer account: one-time $5 fee, and the EU trader/non-trader declaration.
-- [ ] Bump the version if anything changed during testing, then push a tag (`git tag v1.0.0 && git push --tags`). The Release workflow attaches `lectern-<version>.zip`: that's the file to upload.
+- [ ] Bump the version if anything changed during testing, then publish a release (Releases → Draft a new release → tag `v1.0.0`). The Release workflow attaches `lectern-<version>.zip`: that is the file to upload.
 - [x] Icon without a play triangle (`scripts/make_icons.py`).
 - [x] Install asks for youtube.com only; the Anthropic and OpenAI hosts are optional and requested when someone connects a key.
 - [x] Screenshots and promo tile in `docs/store/` (regenerate with `python3 tests/screenshots.py`).

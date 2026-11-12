@@ -1,12 +1,20 @@
 name: Release
 
-# Push a tag like v1.0.1 (matching manifest.json's version) to publish a release with the store zip.
+# Attaches the store zip (lectern-<version>.zip) to a release. Either:
+#   - on GitHub: Releases → Draft a new release → new tag like v1.0.1 → Publish, or
+#   - from a clone: git tag v1.0.1 && git push origin v1.0.1
+# The tag has to match manifest.json's version.
 on:
   push:
     tags: ['v*']
+  release:
+    types: [published]
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
 
 jobs:
   release:
@@ -20,6 +28,12 @@ jobs:
             echo "Tag $GITHUB_REF_NAME doesn't match manifest version $v"; exit 1
           fi
       - run: python3 scripts/package.py
-      - run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "Lectern ${GITHUB_REF_NAME#v}" --generate-notes
+      - name: Create the release, or add the zip to the one made on GitHub
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.zip --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.zip --title "Lectern ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
