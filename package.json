@@ -1,0 +1,16 @@
+{
+  "name": "lectern",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Timestamped notes, transcripts and topic folders for the YouTube videos you learn from.",
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint src",
+    "test": "python3 tests/e2e.py",
+    "package": "python3 scripts/package.py"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0"
+  }
+}

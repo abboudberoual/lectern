@@ -1,0 +1,30 @@
+name: Something isn't working
+description: A bug in the notes panel, library, Ask or anything else.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      placeholder: |
+        1. Open a video
+        2. ...
+  - type: input
+    id: video
+    attributes:
+      label: Video (if it matters)
+  - type: input
+    id: version
+    attributes:
+      label: Lectern and Chrome version
+      description: Filled in for you when you report from the extension. Otherwise, see chrome://extensions.
+  - type: markdown
+    attributes:
+      value: Please don't paste API keys, notes or anything private here. Issues are public.

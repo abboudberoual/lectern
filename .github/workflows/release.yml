@@ -1,0 +1,25 @@
+name: Release
+
+# Push a tag like v1.0.1 (matching manifest.json's version) to publish a release with the store zip.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches manifest.json
+        run: |
+          v=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
+          if [ "v$v" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match manifest version $v"; exit 1
+          fi
+      - run: python3 scripts/package.py
+      - run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "Lectern ${GITHUB_REF_NAME#v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

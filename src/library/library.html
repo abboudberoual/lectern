@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lectern</title>
+    <link rel="icon" href="../../icons/icon32.png" />
+    <link rel="stylesheet" href="../shared/theme.css" />
+    <link rel="stylesheet" href="library.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="side" aria-label="Library navigation">
+        <div class="side-head">
+          <img src="../../icons/icon32.png" alt="" width="22" height="22" />
+          <span>Lectern</span>
+        </div>
+        <label class="side-search">
+          <span class="sr-only">Search</span>
+          <input id="search" class="field" type="search" aria-label="Search notes and transcripts" placeholder="Search" autocomplete="off" />
+        </label>
+        <nav id="nav" class="side-nav"></nav>
+        <div class="side-section">
+          <h2 id="foldersLabel">Folders</h2>
+          <button id="newFolder" class="icon-btn" type="button" title="New folder" aria-label="New folder"></button>
+        </div>
+        <ul id="tree" class="tree" role="tree" aria-labelledby="foldersLabel"></ul>
+        <div class="side-foot">
+          <button id="settingsBtn" class="btn quiet" type="button"></button>
+          <input id="importFile" type="file" accept="application/json,.json" hidden />
+        </div>
+      </aside>
+      <main id="main" class="lib-main" tabindex="-1"></main>
+    </div>
+    <script type="module" src="library.js"></script>
+  </body>
+</html>

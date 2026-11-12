@@ -1,0 +1,11 @@
+name: Idea
+description: Something that would make Lectern better for learning.
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: Describe what you were trying to do when you wished it worked differently.
+    validations:
+      required: true

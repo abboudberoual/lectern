@@ -1,0 +1,54 @@
+# Working on Lectern
+
+Lectern is plain JavaScript with no build step: the files in `src/` are what Chrome runs.
+
+## Run it
+
+Load the repo folder at `chrome://extensions` with **Load unpacked**. After changing code, click the reload arrow on Lectern's card and reload any open YouTube tabs.
+
+## Check it
+
+```sh
+npm install          # eslint, once
+npm run lint
+
+pip install playwright && python -m playwright install chromium
+npm test             # same as: python3 tests/e2e.py
+```
+
+The end-to-end suite loads the extension in Chromium and points `www.youtube.com`, `api.anthropic.com` and `api.openai.com` at a mock server (`tests/mock/server.py`) that imitates the parts Lectern depends on: the player, caption requests that need the player's token, the transcript panel, videos without captions, Trusted Types, and streaming AI answers. It starts the mock server itself.
+
+The mock listens on `127.0.0.1:443`, so on Linux either run as root or allow low ports once:
+
+```sh
+sudo sysctl -w net.ipv4.ip_unprivileged_port_start=0
+```
+
+Screenshots from each run land in `tests/.out/shots`. `python3 tests/screenshots.py` regenerates the README images in `docs/screenshots`.
+
+## When transcript capture breaks
+
+That's usually YouTube changing its page. The code is in `src/transcript.js`, which tries four methods in order and records what each one did; the in-app report includes that record. Once you know what changed:
+
+1. Fix the method in `src/transcript.js`.
+2. Teach `tests/mock/server.py` the new behaviour, so the suite covers it from now on.
+3. Run `npm test`.
+
+## Layout
+
+- `manifest.json`: extension definition
+- `src/content.js`: runs on YouTube (video time, seeking, player button, watch position)
+- `src/transcript.js`: transcript capture, injected into the YouTube page
+- `src/background.js`: keyboard shortcuts, opening the panel, capture jobs
+- `src/sidepanel/`: the notes panel and Ask
+- `src/library/`: the library page
+- `src/shared/`: storage, helpers, AI providers and the shared design tokens
+- `fonts/`: Atkinson Hyperlegible Next and Barlow Condensed (SIL Open Font License)
+
+## Release
+
+1. Bump `version` in `manifest.json` (and `package.json`).
+2. Commit, then tag and push: `git tag v1.0.1 && git push --tags`.
+3. The Release workflow builds `lectern-<version>.zip` and attaches it to a GitHub release. That zip is what you upload to the Chrome Web Store.
+
+`python3 scripts/package.py` builds the same zip locally, in `dist/`.

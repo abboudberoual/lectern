@@ -1,0 +1,36 @@
+name: Transcript didn't come through
+description: Lectern couldn't get a video's transcript, or got the wrong one.
+title: "Transcript capture failed: "
+labels: [transcript]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        YouTube changes its page often, and transcript capture is the part that breaks. Reports with a video link are the fastest way to get it fixed. Your notes are never affected, and pasting the transcript in (Transcript tab, Paste one) works in the meantime.
+  - type: input
+    id: video
+    attributes:
+      label: Video
+      description: The YouTube link. Public videos only, please.
+      placeholder: https://www.youtube.com/watch?v=
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Lectern and Chrome version
+      description: Filled in for you when you report from the extension.
+  - type: dropdown
+    id: captions
+    attributes:
+      label: Does YouTube itself show captions or "Show transcript" for this video?
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+  - type: textarea
+    id: details
+    attributes:
+      label: What Lectern tried
+      description: Filled in for you when you report from the extension. Anything else you noticed helps too.
+      render: text
