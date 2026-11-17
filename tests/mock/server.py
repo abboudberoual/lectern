@@ -271,6 +271,10 @@ def notion_post(h, u, raw):
         NOTION["refresh"].add(refresh)
         return h.send(200, json.dumps({"access_token": access, "refresh_token": refresh, "token_type": "bearer", "expires_in": 28800}), "application/json")
     if u.path == "/mcp":
+        # Like MCP servers that guard against DNS rebinding: requests carrying a browser Origin are refused
+        if h.headers.get("Origin"):
+            NOTION.setdefault("refused_origins", []).append(h.headers.get("Origin"))
+            return h.send(403, json.dumps({"jsonrpc": "2.0", "error": {"code": -32000, "message": "Forbidden: Invalid Origin header"}, "id": None}), "application/json")
         token = (h.headers.get("Authorization") or "").replace("Bearer ", "")
         if token not in NOTION["tokens"]:
             return h.send(401, json.dumps({"error": "invalid_token"}), "application/json", {"WWW-Authenticate": 'Bearer resource_metadata="https://mcp.notion.com/.well-known/oauth-protected-resource/mcp"'})

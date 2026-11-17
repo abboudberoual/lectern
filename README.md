@@ -97,6 +97,7 @@ Everything is stored in Chrome on your computer. Nothing is sent anywhere except
 - **api.anthropic.com or api.openai.com**: not asked for at install. Chrome asks when you connect a key for Ask, and access is given back when you remove the key.
 - **mcp.notion.com**: not asked for at install. Chrome asks when you click Connect Notion, and access is given back when you disconnect.
 - **Identity**: shows Notion's sign-in page in its own window and brings you back to Lectern afterwards.
+- **Network rules** (declarativeNetRequest, only where Lectern has access): removes the "Origin" header from Lectern's own requests to Notion's MCP server, which refuses requests that carry an extension's origin.
 - **Side panel, storage, scripting, context menu**: the notes panel, saving your notes, transcript capture and the "Open library" menu item.
 
 ## Contributing

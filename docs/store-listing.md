@@ -66,6 +66,7 @@ Lectern is not affiliated with YouTube, Google, Anthropic or OpenAI.
 - `sidePanel`: the notes panel shown beside the video.
 - `scripting`: injects the transcript reader into the YouTube tab when the user saves a video or clicks Get transcript, and into YouTube tabs already open when the extension is installed.
 - `contextMenus`: the "Open library" item on the toolbar icon's menu.
+- `declarativeNetRequestWithHostAccess`: one session rule that removes the Origin header from this extension's own requests to mcp.notion.com (initiator: the extension itself). Notion's MCP server refuses requests carrying a chrome-extension:// Origin as a guard against DNS rebinding. The rule only takes effect once the user has granted the optional mcp.notion.com host permission by connecting Notion, and touches no other site or request.
 - `identity`: shows Notion's own sign-in page in a window when the user clicks Connect Notion (chrome.identity.launchWebAuthFlow), and returns them to Lectern. Used only for the optional Notion sync.
 - Host `https://www.youtube.com/*`: reads the current video time, jumps to timestamps, adds a note button to the player, and reads captions.
 - Optional hosts `https://api.anthropic.com/*`, `https://api.openai.com/*`: not granted at install. Requested only when the user connects their own API key for the optional Ask feature, to send their question with the video's transcript and their notes. Released when they remove the key.

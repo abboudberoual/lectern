@@ -236,6 +236,49 @@ async function accessToken() {
 let session = null; // { id, protocol, tools }
 let seq = 0;
 
+// MCP servers refuse requests that carry a browser Origin header (their guard against DNS
+// rebinding), and Chrome adds chrome-extension://… to this extension's own requests. This rule
+// removes that header, only for Lectern's requests to Notion's MCP server.
+const ORIGIN_RULE = 7101;
+let originRule = null;
+
+function stripOrigin() {
+  if (!originRule) {
+    originRule = chrome.declarativeNetRequest
+      .updateSessionRules({
+        removeRuleIds: [ORIGIN_RULE],
+        addRules: [
+          {
+            id: ORIGIN_RULE,
+            priority: 1,
+            action: { type: 'modifyHeaders', requestHeaders: [{ header: 'origin', operation: 'remove' }] },
+            condition: { requestDomains: ['mcp.notion.com'], initiatorDomains: [chrome.runtime.id], resourceTypes: ['xmlhttprequest', 'other'] },
+          },
+        ],
+      })
+      .catch(() => {
+        originRule = null;
+      });
+  }
+  return originRule;
+}
+
+/** Notion's stated reason for refusing a request, if it gave one. */
+async function refusal(res) {
+  try {
+    const text = await res.text();
+    try {
+      const j = JSON.parse(text);
+      const m = (j.error && (j.error.message || j.error_description || (typeof j.error === 'string' ? j.error : ''))) || j.message || '';
+      return String(m).slice(0, 160);
+    } catch {
+      return text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+    }
+  } catch {
+    return '';
+  }
+}
+
 function parseEvent(block) {
   const data = block
     .split(/\r?\n/)
@@ -280,6 +323,7 @@ async function rpc(method, params, { notify = false, retried = false } = {}) {
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${await accessToken()}` };
   if (session && session.id && method !== 'initialize') headers['Mcp-Session-Id'] = session.id;
   if (session && session.protocol) headers['MCP-Protocol-Version'] = session.protocol;
+  await stripOrigin();
   let res;
   try {
     res = await fetch(MCP_URL, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -299,7 +343,10 @@ async function rpc(method, params, { notify = false, retried = false } = {}) {
     await markReconnect();
     throw new NotionError('Notion signed Lectern out. Connect again in Settings.', 'auth');
   }
-  if (!res.ok && res.status !== 202) throw new NotionError(`Notion returned an error (${res.status}).`, 'http');
+  if (!res.ok && res.status !== 202) {
+    const why = await refusal(res);
+    throw new NotionError(`Notion refused the request (${res.status})${why ? `: ${why}` : ''}.`, 'http');
+  }
   if (method === 'initialize') session = { id: res.headers.get('Mcp-Session-Id'), protocol: null, tools: null };
   if (notify) return null;
   const msg = await readReply(res, body.id);
