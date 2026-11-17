@@ -3,6 +3,7 @@
 import { addNote, getSettings, getVideo, saveTranscript } from './shared/db.js';
 import { fetchVideoMeta, formatTime } from './shared/util.js';
 import { extractTranscriptInPage } from './transcript.js';
+import { NSYNC, getNotionSync, notionCares, runNotionSync, scheduleNotionSync } from './shared/notion.js';
 
 const LIBRARY_URL = chrome.runtime.getURL('src/library/library.html');
 
@@ -28,6 +29,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
   if (details.reason === 'install') chrome.tabs.create({ url: `${LIBRARY_URL}?welcome=1` });
 });
+
+// Notion sync: follow note changes, a few seconds after the last one
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local' || changes[NSYNC]) return;
+  const st = await getNotionSync();
+  if (st && st.auth && !st.needsReconnect && notionCares(changes, st.includeTranscripts)) scheduleNotionSync();
+});
+chrome.runtime.onStartup.addListener(() => scheduleNotionSync(5000));
 
 chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId === 'open-library') openLibrary();
@@ -162,6 +171,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     captureTranscript(sender.tab.id, msg.videoId, { auto: true });
     reply({ ok: true });
     return;
+  }
+
+  if (msg.type === 'notionSync') {
+    runNotionSync().then((result) => reply({ result }));
+    return true;
   }
 
   if (msg.type === 'captureTranscript') {

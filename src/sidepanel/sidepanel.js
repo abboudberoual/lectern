@@ -27,7 +27,6 @@ import {
 import {
   copyText,
   debounce,
-  downloadText,
   fetchVideoMeta,
   formatTime,
   h,
@@ -36,7 +35,6 @@ import {
   parsePastedTranscript,
   plural,
   relativeTime,
-  safeFilename,
   thumbUrl,
   videoToMarkdown,
   watchUrl,
@@ -44,6 +42,8 @@ import {
 import { applyTheme, askConfirm, askText, autosize, icon, openMenu, showToast, syncWriteField, writeField } from '../shared/ui.js';
 import { createNoteList } from '../shared/notelist.js';
 import { createAsk } from './ask.js';
+import { exportFlow } from '../shared/exporter.js';
+import { folderSyncStatus, resumeFolderSync, startFolderSync } from '../shared/foldersync.js';
 
 const params = new URLSearchParams(location.search);
 const PINNED_TAB = params.get('tab') ? Number(params.get('tab')) : null; // used by tests
@@ -105,7 +105,26 @@ const askBtn = h('button', { class: 'icon-btn ask-btn', type: 'button', title: '
 const folderSel = h('select', { class: 'folder-sel', 'aria-label': 'Folder' });
 const folderPick = h('label', { class: 'folder-pick' }, icon('folder'), folderSel, icon('chevronDown'));
 const adNote = h('p', { class: 'ad-note', role: 'status', hidden: true }, 'An ad is playing. Notes wait for the video.');
-const vHead = h('header', { class: 'v-head' }, h('div', { class: 'v-title-row' }, vTitle, askBtn, libBtn, vMenuBtn), folderPick, adNote);
+const syncNotice = h(
+  'p',
+  { class: 'sync-notice', role: 'status', hidden: true },
+  'Folder sync is paused. ',
+  h(
+    'button',
+    {
+      type: 'button',
+      class: 'linkish',
+      onclick: async () => {
+        if (await resumeFolderSync()) {
+          syncNotice.hidden = true;
+          showToast('Folder sync resumed');
+        }
+      },
+    },
+    'Resume'
+  )
+);
+const vHead = h('header', { class: 'v-head' }, h('div', { class: 'v-title-row' }, vTitle, askBtn, libBtn, vMenuBtn), folderPick, adNote, syncNotice);
 
 const tabNotes = h('button', { role: 'tab', type: 'button', class: 'tab', 'aria-selected': 'true', 'aria-controls': 'notesPane', id: 'tabNotes' }, 'Notes');
 const tabTr = h('button', { role: 'tab', type: 'button', class: 'tab', 'aria-selected': 'false', 'aria-controls': 'trPane', id: 'tabTranscript' }, 'Transcript');
@@ -459,10 +478,8 @@ vMenuBtn.addEventListener('click', () => {
   const v = S.video;
   const items = [];
   if (v) items.push({ label: 'Show in library', icon: 'books', onClick: () => openLibrary(`video=${S.videoId}`) });
-  items.push(
-    { label: 'Copy notes as Markdown', icon: 'copy', onClick: copyMarkdown },
-    { label: 'Download notes (.md)', icon: 'download', onClick: downloadMarkdown }
-  );
+  items.push({ label: 'Copy notes as Markdown', icon: 'copy', onClick: copyMarkdown });
+  if (v) items.push({ label: 'Export…', icon: 'download', onClick: exportVideoNotes });
   if (v) {
     items.push({ label: v.done ? 'Mark as not finished' : 'Mark as finished', icon: 'check', onClick: toggleDone });
     items.push('sep', { label: 'Remove from library', icon: 'trash', danger: true, onClick: removeVideo });
@@ -481,10 +498,9 @@ async function copyMarkdown() {
   (await copyText(md)) ? showToast('Notes copied as Markdown') : showToast('Couldn’t copy. Try the download instead.');
 }
 
-function downloadMarkdown() {
+async function exportVideoNotes() {
   flushPendingEdits();
-  const v = S.video || { videoId: S.videoId, title: vTitle.textContent, notes: [] };
-  downloadText(`${safeFilename(v.title || v.videoId)}.md`, videoToMarkdown(v, S.transcript, { includeTranscript: true }), 'text/markdown');
+  await exportFlow({ video: S.videoId }, 'Export notes', { onError: showToast });
 }
 
 async function toggleDone() {
@@ -1225,3 +1241,7 @@ async function boot() {
   }, 500);
 }
 boot();
+
+// Keep a synced Markdown folder up to date while the panel is open
+startFolderSync({ onStatus: (r) => (syncNotice.hidden = r !== 'paused') });
+folderSyncStatus().then((st) => (syncNotice.hidden = st.state !== 'paused'));

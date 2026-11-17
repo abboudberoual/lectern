@@ -44,13 +44,15 @@ import {
   parseVideoId,
   plural,
   REPO_URL,
-  safeFilename,
   thumbUrl,
   videoToMarkdown,
   watchUrl,
 } from '../shared/util.js';
 import { applyTheme, askConfirm, askText, autosize, icon, openMenu, showToast, syncWriteField, writeField } from '../shared/ui.js';
 import { createAISetup } from '../shared/aisetup.js';
+import { exportFlow } from '../shared/exporter.js';
+import { folderSyncStatus, resumeFolderSync, startFolderSync } from '../shared/foldersync.js';
+import { createSyncSection } from './syncsettings.js';
 import { createNoteList } from '../shared/notelist.js';
 
 const L = {
@@ -232,7 +234,7 @@ function folderMenu(anchor, id) {
     { label: f.description ? 'Edit goal' : 'Add a goal', icon: 'target', onClick: () => editGoal(id) },
     { label: 'New folder inside', icon: 'plus', onClick: () => newFolderFlow(id) },
     { label: 'Move folder…', icon: 'move', onClick: () => moveFolderFlow(id) },
-    { label: 'Export notes (.md)', icon: 'download', onClick: () => exportFolderMarkdown(id) },
+    { label: 'Export…', icon: 'download', onClick: () => exportFlow({ folder: id }, `Export “${f.name}”`, { onError: showToast }) },
     'sep',
     { label: `Delete “${f.name}”`, icon: 'trash', danger: true, onClick: () => deleteFolderFlow(id) },
   ]);
@@ -305,18 +307,6 @@ async function deleteFolderFlow(id) {
   await deleteFolder(id);
   const r = currentRoute();
   if (r.view === 'folder' && folderSubtree(L.folders, id).includes(r.folder)) go({ folder: f.parentId || 'unfiled' }, { replace: true });
-}
-
-async function exportFolderMarkdown(id) {
-  const ids = folderSubtree(L.folders, id);
-  const parts = [`# ${L.folders[id].name}`, ''];
-  for (const fid of ids) {
-    const vids = videosIn(fid);
-    if (!vids.length) continue;
-    if (fid !== id) parts.push(`## ${folderPath(L.folders, fid).slice(folderPath(L.folders, id).length).join(' / ')}`, '');
-    for (const v of vids) parts.push(videoToMarkdown(v, null).replace(/^# /, fid === id ? '## ' : '### ').replace(/\n## /g, fid === id ? '\n### ' : '\n#### '), '');
-  }
-  downloadText(`${safeFilename(L.folders[id].name)}.md`, parts.join('\n'), 'text/markdown');
 }
 
 // ---------------------------------------------------------------- drag & drop
@@ -656,6 +646,7 @@ function videoMenu(anchor, v) {
     ...(resume ? [{ label: 'Watch from the start', icon: 'back5', onClick: () => openVideo(v.videoId, 0) }] : []),
     { label: 'Move to folder…', icon: 'move', onClick: () => moveVideoFlow(v, moveTargets) },
     { label: 'Copy notes as Markdown', icon: 'copy', onClick: async () => (await copyText(videoToMarkdown(v, null))) && showToast('Notes copied') },
+    { label: 'Export…', icon: 'download', onClick: () => exportFlow({ video: v.videoId }, 'Export notes', { onError: showToast }) },
     'sep',
     { label: 'Remove from library', icon: 'trash', danger: true, onClick: () => removeVideoFlow(v) },
   ]);
@@ -760,11 +751,7 @@ async function renderVideoView(r) {
     openMenu(moreBtn, [
       ...(resumeTime(L.byId.get(id)) ? [{ label: 'Watch from the start', icon: 'play', onClick: () => openVideo(id, 0) }] : []),
       { label: 'Copy notes as Markdown', icon: 'copy', onClick: async () => (await copyText(videoToMarkdown(L.byId.get(id), transcript))) && showToast('Notes copied') },
-      {
-        label: 'Download notes (.md)',
-        icon: 'download',
-        onClick: () => downloadText(`${safeFilename(L.byId.get(id).title || id)}.md`, videoToMarkdown(L.byId.get(id), transcript, { includeTranscript: true }), 'text/markdown'),
-      },
+      { label: 'Export…', icon: 'download', onClick: () => exportFlow({ video: id }, 'Export notes', { onError: showToast }) },
       { label: 'Copy video link', icon: 'external', onClick: async () => (await copyText(watchUrl(id))) && showToast('Link copied') },
       'sep',
       { label: 'Remove from library', icon: 'trash', danger: true, onClick: () => removeVideoFlow(L.byId.get(id)) },
@@ -1193,6 +1180,7 @@ async function openSettings() {
     h('small', null, 'Use your own Claude or OpenAI API key to ask questions about a video from the notes panel.'),
     await createAISetup({ onDone: () => showToast('Ask is connected') })
   );
+  const syncSection = createSyncSection();
   const toggle = (key, label, help) => {
     const input = h('input', { type: 'checkbox', checked: !!s[key] });
     input.addEventListener('change', () => setSettings({ [key]: input.checked }));
@@ -1225,6 +1213,7 @@ async function openSettings() {
     h('label', { class: 'set-field' }, h('strong', null, 'Note timestamps'), lead),
     h('label', { class: 'set-field' }, h('strong', null, 'Appearance'), theme),
     askSection,
+    syncSection,
     h(
       'div',
       { class: 'set-field' },
@@ -1254,7 +1243,10 @@ async function openSettings() {
     h('div', { class: 'dlg-actions' }, h('button', { class: 'btn primary', type: 'button', onclick: () => dlg.close() }, 'Done'))
   );
   document.body.append(dlg);
-  dlg.addEventListener('close', () => dlg.remove());
+  dlg.addEventListener('close', () => {
+    syncSection.cleanup();
+    dlg.remove();
+  });
   dlg.showModal();
 }
 
@@ -1289,7 +1281,7 @@ let pending = {};
 let renderAfterDrag = false;
 
 async function resync() {
-  const keys = Object.keys(pending).filter((k) => k !== 'ai');
+  const keys = Object.keys(pending).filter((k) => !QUIET_KEYS.has(k));
   pending = {};
   if (!keys.length) return;
   await loadAll();
@@ -1321,10 +1313,38 @@ document.addEventListener('dragend', () => {
   }
 });
 
+// Keys that don't change what the library shows
+const QUIET_KEYS = new Set(['ai', 'fsync', 'nsync']);
+
+// Folder sync runs while the library or the panel is open. When Chrome drops the folder
+// permission (after a restart, unless "Allow on every visit" was chosen), offer to resume.
+const syncPaused = h(
+  'p',
+  { class: 'sync-paused', hidden: true },
+  'Folder sync is paused. ',
+  h(
+    'button',
+    {
+      type: 'button',
+      class: 'linkish',
+      onclick: async () => {
+        if (await resumeFolderSync()) {
+          syncPaused.hidden = true;
+          showToast('Folder sync resumed');
+        }
+      },
+    },
+    'Resume'
+  )
+);
+document.querySelector('.side-foot').prepend(syncPaused);
+
 async function boot() {
   const win = await chrome.windows.getCurrent();
   L.windowId = win.id;
   await loadAll();
   await render();
+  startFolderSync({ onStatus: (r) => (syncPaused.hidden = r !== 'paused') });
+  folderSyncStatus().then((s) => (syncPaused.hidden = s.state !== 'paused'));
 }
 boot();

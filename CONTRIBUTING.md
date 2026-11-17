@@ -16,7 +16,7 @@ pip install playwright && python -m playwright install chromium
 npm test             # same as: python3 tests/e2e.py
 ```
 
-The end-to-end suite loads the extension in Chromium and points `www.youtube.com`, `api.anthropic.com` and `api.openai.com` at a mock server (`tests/mock/server.py`) that imitates the parts Lectern depends on: the player, caption requests that need the player's token, the transcript panel, videos without captions, Trusted Types, and streaming AI answers. It starts the mock server itself.
+The end-to-end suite loads the extension in Chromium and points `www.youtube.com`, `api.anthropic.com` and `api.openai.com` at a mock server (`tests/mock/server.py`) that imitates the parts Lectern depends on: the player, caption requests that need the player's token, the transcript panel, videos without captions, Trusted Types, streaming AI answers, and Notion's sign-in and MCP server (`mcp.notion.com`). Folder sync is tested with the browser's private file system standing in for a folder the person picks. It starts the mock server itself.
 
 The mock listens on `127.0.0.1:443`, so on Linux either run as root or allow low ports once:
 
@@ -44,7 +44,8 @@ That's usually YouTube changing its page. The code is in `src/transcript.js`, wh
 - `src/background.js`: keyboard shortcuts, opening the panel, capture jobs
 - `src/sidepanel/`: the notes panel and Ask
 - `src/library/`: the library page
-- `src/shared/`: storage, helpers, AI providers and the shared design tokens
+- `src/shared/`: storage, helpers, AI providers, export (`doc.js`, `docx.js`, `exporter.js`), sync (`foldersync.js`, `notion.js`) and the shared design tokens
+- `src/print/`: the print-ready page behind PDF export
 - `fonts/`: Atkinson Hyperlegible Next and Barlow Condensed (SIL Open Font License)
 
 ## Release

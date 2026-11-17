@@ -161,6 +161,142 @@ window.ytcfg = {{ d: {{INNERTUBE_CONTEXT:{{client:{{clientName:"WEB",clientVersi
 </script></body></html>"""
 
 
+
+# ---------- mock Notion (OAuth + hosted MCP server at mcp.notion.com)
+
+import base64, hashlib, uuid
+
+NOTION = {"clients": {}, "codes": {}, "tokens": set(), "refresh": set(), "sessions": set(), "pages": {}, "calls": [], "token_requests": []}
+NOTION_TOOLS = ["notion-search", "notion-fetch", "notion-create-pages", "notion-update-page", "notion-move-pages"]
+
+
+def notion_url(pid):
+    return "https://www.notion.so/" + pid.replace("-", "")
+
+
+def notion_tool(name, args):
+    """Returns (is_error, text)."""
+    NOTION["calls"].append({"name": name, "args": args})
+    pages = NOTION["pages"]
+    if name == "notion-create-pages":
+        parent = (args.get("parent") or {}).get("page_id")
+        if parent and parent.replace("-", "") not in pages:
+            return True, f"Could not find parent page with ID {parent}"
+        out = []
+        for spec in args.get("pages", []):
+            pid = str(uuid.uuid4())
+            key = pid.replace("-", "")
+            pages[key] = {"id": key, "title": (spec.get("properties") or {}).get("title", ""), "content": spec.get("content", ""), "parent": parent.replace("-", "") if parent else None}
+            out.append({"id": pid, "url": notion_url(pid), "properties": {"title": pages[key]["title"]}})
+        return False, json.dumps({"pages": out})
+    if name == "notion-update-page":
+        key = (args.get("page_id") or "").replace("-", "")
+        if key not in pages:
+            return True, f"Could not find page with ID {args.get('page_id')}"
+        cmd = args.get("command")
+        if cmd == "update_properties":
+            pages[key]["title"] = (args.get("properties") or {}).get("title", pages[key]["title"])
+        elif cmd == "replace_content":
+            pages[key]["content"] = args.get("new_str", "")
+        else:
+            return True, f"Unsupported command {cmd}"
+        return False, json.dumps({"page_id": key})
+    if name == "notion-move-pages":
+        target = ((args.get("new_parent") or {}).get("page_id") or "").replace("-", "")
+        if target not in pages:
+            return True, "Could not find the new parent page"
+        for pid in args.get("page_or_database_ids", []):
+            if pid.replace("-", "") in pages:
+                pages[pid.replace("-", "")]["parent"] = target
+        return False, json.dumps({"result": "moved"})
+    return True, f"Unknown tool {name}"
+
+
+def s256(verifier):
+    return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+
+
+def notion_get(h, u, q):
+    meta = {
+        "issuer": "https://mcp.notion.com",
+        "authorization_endpoint": "https://mcp.notion.com/authorize",
+        "token_endpoint": "https://mcp.notion.com/token",
+        "registration_endpoint": "https://mcp.notion.com/register",
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["none"],
+    }
+    if u.path == "/mcp/.well-known/oauth-protected-resource":  # where Notion documents it
+        return h.send(200, json.dumps({"resource": "https://mcp.notion.com/mcp", "authorization_servers": ["https://mcp.notion.com"]}), "application/json")
+    if u.path == "/.well-known/oauth-authorization-server":
+        return h.send(200, json.dumps(meta), "application/json")
+    if u.path == "/authorize":
+        g = lambda k: (q.get(k) or [""])[0]
+        client = NOTION["clients"].get(g("client_id"))
+        if not client or g("redirect_uri") not in client["redirect_uris"] or g("code_challenge_method") != "S256" or not g("code_challenge"):
+            return h.send(400, "bad authorize request")
+        code = "code-" + uuid.uuid4().hex[:8]
+        NOTION["codes"][code] = {"challenge": g("code_challenge"), "redirect_uri": g("redirect_uri"), "client_id": g("client_id"), "resource": g("resource")}
+        loc = g("redirect_uri") + "?" + urllib.parse.urlencode({"code": code, "state": g("state")})
+        return h.send(302, "", "text/plain", {"Location": loc})
+    if u.path == "/__notion":
+        return h.send(200, json.dumps({k: (sorted(v) if isinstance(v, set) else v) for k, v in NOTION.items()}), "application/json")
+    if u.path == "/__notion_reset":
+        for k in ("pages", "calls", "token_requests"):
+            NOTION[k] = {} if k == "pages" else []
+        return h.send(200, "ok")
+    return h.send(404, "not found")
+
+
+def notion_post(h, u, raw):
+    if u.path == "/register":
+        body = json.loads(raw or b"{}")
+        cid = "client-" + uuid.uuid4().hex[:8]
+        NOTION["clients"][cid] = {"redirect_uris": body.get("redirect_uris", []), "name": body.get("client_name")}
+        return h.send(201, json.dumps({"client_id": cid, "redirect_uris": body.get("redirect_uris", []), "token_endpoint_auth_method": "none"}), "application/json")
+    if u.path == "/token":
+        f = {k: v[0] for k, v in urllib.parse.parse_qs(raw.decode()).items()}
+        NOTION["token_requests"].append(f)
+        if f.get("grant_type") == "authorization_code":
+            c = NOTION["codes"].pop(f.get("code", ""), None)
+            if not c or c["client_id"] != f.get("client_id") or c["redirect_uri"] != f.get("redirect_uri") or s256(f.get("code_verifier", "")) != c["challenge"]:
+                return h.send(400, json.dumps({"error": "invalid_grant"}), "application/json")
+        elif f.get("grant_type") == "refresh_token":
+            if f.get("refresh_token") not in NOTION["refresh"]:
+                return h.send(400, json.dumps({"error": "invalid_grant"}), "application/json")
+            NOTION["refresh"].discard(f.get("refresh_token"))
+        else:
+            return h.send(400, json.dumps({"error": "unsupported_grant_type"}), "application/json")
+        access, refresh = "acc-" + uuid.uuid4().hex, "ref-" + uuid.uuid4().hex
+        NOTION["tokens"].add(access)
+        NOTION["refresh"].add(refresh)
+        return h.send(200, json.dumps({"access_token": access, "refresh_token": refresh, "token_type": "bearer", "expires_in": 28800}), "application/json")
+    if u.path == "/mcp":
+        token = (h.headers.get("Authorization") or "").replace("Bearer ", "")
+        if token not in NOTION["tokens"]:
+            return h.send(401, json.dumps({"error": "invalid_token"}), "application/json", {"WWW-Authenticate": 'Bearer resource_metadata="https://mcp.notion.com/.well-known/oauth-protected-resource/mcp"'})
+        msg = json.loads(raw or b"{}")
+        method = msg.get("method")
+        if method == "initialize":
+            sid = uuid.uuid4().hex
+            NOTION["sessions"].add(sid)
+            res = {"protocolVersion": msg["params"].get("protocolVersion"), "capabilities": {"tools": {}}, "serverInfo": {"name": "mock-notion", "version": "1"}}
+            return h.send(200, json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": res}), "application/json", {"Mcp-Session-Id": sid})
+        if (h.headers.get("Mcp-Session-Id") or "") not in NOTION["sessions"]:
+            return h.send(404, "unknown session")
+        if "id" not in msg:
+            return h.send(202, "")
+        if method == "tools/list":
+            result = {"tools": [{"name": n, "inputSchema": {"type": "object"}} for n in NOTION_TOOLS]}
+            return h.send(200, json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), "application/json")
+        if method == "tools/call":
+            err, text = notion_tool(msg["params"]["name"], msg["params"].get("arguments") or {})
+            result = {"content": [{"type": "text", "text": text}], "isError": err}
+            # tool replies come back as a stream, like the real server can send them
+            return h.sse([(None, json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}))])
+        return h.send(200, json.dumps({"jsonrpc": "2.0", "id": msg["id"], "error": {"code": -32601, "message": "Method not found"}}), "application/json")
+    return h.send(404, "not found")
+
+
 class H(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -213,6 +349,8 @@ class H(http.server.BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(n)
         host = (self.headers.get("Host") or "").split(":")[0]
+        if host == "mcp.notion.com":
+            return notion_post(self, u, raw)
         if host in ("api.anthropic.com", "api.openai.com"):
             body = json.loads(raw or b"{}")
             STATS.setdefault("ai", []).append({"host": host, "path": u.path, "headers": {k.lower(): v for k, v in self.headers.items()}, "body": body})
@@ -245,6 +383,9 @@ class H(http.server.BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(u.query)
         host = (self.headers.get("Host") or "").split(":")[0]
+
+        if host == "mcp.notion.com":
+            return notion_get(self, u, q)
 
         if host in ("api.anthropic.com", "api.openai.com") and u.path == "/v1/models":
             key = self.headers.get("x-api-key") or (self.headers.get("authorization") or "").replace("Bearer ", "")

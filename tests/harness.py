@@ -6,7 +6,7 @@ EXT = os.path.dirname(HERE)
 OUT = os.path.join(HERE, ".out")
 os.makedirs(OUT, exist_ok=True)
 
-HOST_RULES = "MAP www.youtube.com 127.0.0.1, MAP i.ytimg.com 127.0.0.1, MAP api.anthropic.com 127.0.0.1, MAP api.openai.com 127.0.0.1"
+HOST_RULES = "MAP www.youtube.com 127.0.0.1, MAP i.ytimg.com 127.0.0.1, MAP api.anthropic.com 127.0.0.1, MAP api.openai.com 127.0.0.1, MAP mcp.notion.com 127.0.0.1"
 
 
 def port_open():

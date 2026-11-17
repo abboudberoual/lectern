@@ -15,6 +15,7 @@ A study notebook for YouTube. Take notes that remember the moment you wrote them
 - **Two kinds of notes.** Time notes are stamped with the video time when you save them. A notepad with pages holds the ideas that aren't tied to one moment.
 - **The transcript stays with the video.** It's saved automatically, searchable alongside your notes, and every line jumps to its moment.
 - **Bring your own AI, or none.** Ask Claude or OpenAI about the whole video or one moment, using your own API key. Answers cite times you can click. Everything else works without it.
+- **Your notes go where you keep notes.** Keep a synced copy in Obsidian (or any folder of Markdown files) or in Notion, and export any video or folder as Markdown, Word or PDF.
 
 ## Install
 
@@ -53,7 +54,24 @@ Alt+J, Alt+K and Alt+L rewind 5 seconds, play/pause and skip 5 seconds while you
 - A video's page shows its time notes and notepad next to the transcript.
 - Search (press `/`) looks through titles, notes, notepad pages and transcripts at once.
 
-**Settings** are at the bottom of the library sidebar: automatic transcripts, pausing the video while you write, stamping notes a few seconds early, appearance, Ask, and backup.
+**Settings** are at the bottom of the library sidebar: automatic transcripts, pausing the video while you write, stamping notes a few seconds early, appearance, Ask, sync, and backup.
+
+## Export and sync
+
+**Export** any video's notes from its ⋯ menu (in the panel or the library), or a whole folder from the folder's ⋯ menu:
+
+- **Markdown**, with every time as a link to that moment.
+- **Word** (.docx), which also opens in Google Docs, Pages and LibreOffice.
+- **PDF**: opens a print-ready page; choose **Save as PDF** in Chrome's print window. Links stay clickable.
+
+Tick **Include the transcript** to add it at the end.
+
+**Sync** (Settings → Sync) keeps a copy of your notes up to date in another app:
+
+- **Markdown folder**, for Obsidian, Logseq or any app that reads a folder of Markdown files. Choose your vault (or any folder) and Lectern writes one file per video under `Lectern/`, in the same folders as your library, with the video's title, channel and link in the file's properties. It updates while Lectern's panel or library is open. After Chrome restarts it may ask you to **Resume**; choose "Allow on every visit" to skip that.
+- **Notion**. Click **Connect Notion** and sign in on Notion's own page (Lectern uses Notion's MCP server). Lectern makes a private "Lectern" page with a page for each folder and video inside it, and updates them a few seconds after your notes change. Move the Lectern page anywhere in your workspace and syncing carries on.
+
+Sync goes one way: Lectern replaces its copies when your notes change, so make edits in Lectern. Removing a video, stopping folder sync or disconnecting Notion leaves the files and pages already made in place.
 
 ## When YouTube changes
 
@@ -69,14 +87,16 @@ Fixes ship as updates. The test suite runs the whole extension against a mock Yo
 
 ## Your data
 
-Everything is stored in Chrome on your computer. Nothing is sent anywhere except the requests your browser already makes to youtube.com and, if you use Ask, your question with that video's transcript and time notes, sent to the provider you connected. Your API key stays in this browser and is never included in backups. See [PRIVACY.md](PRIVACY.md) for the details.
+Everything is stored in Chrome on your computer. Nothing is sent anywhere except the requests your browser already makes to youtube.com, plus what you turn on: if you use Ask, your question with that video's transcript and time notes, sent to the provider you connected; if you connect Notion, your notes, sent to your Notion workspace. Your API key and Notion sign-in stay in this browser and are never included in backups. See [PRIVACY.md](PRIVACY.md) for the details.
 
-**Export backup** in Settings saves a `.json` copy; **Import backup** merges it back in, on this computer or another. Folders and single videos also export as Markdown with clickable timestamps. Removing the extension deletes its data, so export first.
+**Export backup** in Settings saves a `.json` copy; **Import backup** merges it back in, on this computer or another. Removing the extension deletes its data, so export first.
 
 ## Permissions
 
 - **Read and change data on youtube.com**: to read the video time, jump to timestamps, add the note button and read captions.
 - **api.anthropic.com or api.openai.com**: not asked for at install. Chrome asks when you connect a key for Ask, and access is given back when you remove the key.
+- **mcp.notion.com**: not asked for at install. Chrome asks when you click Connect Notion, and access is given back when you disconnect.
+- **Identity**: shows Notion's sign-in page in its own window and brings you back to Lectern afterwards.
 - **Side panel, storage, scripting, context menu**: the notes panel, saving your notes, transcript capture and the "Open library" menu item.
 
 ## Contributing

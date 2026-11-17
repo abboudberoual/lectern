@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lectern",
   "short_name": "Lectern",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Timestamped notes, transcripts and topic folders for the YouTube videos you learn from. Private, no account, bring your own AI.",
   "minimum_chrome_version": "116",
   "icons": {
@@ -30,14 +30,16 @@
     "unlimitedStorage",
     "sidePanel",
     "scripting",
-    "contextMenus"
+    "contextMenus",
+    "identity"
   ],
   "host_permissions": [
     "https://www.youtube.com/*"
   ],
   "optional_host_permissions": [
     "https://api.anthropic.com/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://mcp.notion.com/*"
   ],
   "content_scripts": [
     {

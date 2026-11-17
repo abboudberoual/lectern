@@ -155,7 +155,7 @@ window.addEventListener('resize', closeMenu);
 
 // ---------- dialogs ----------
 
-function dialogShell(title, body, actions) {
+export function dialogShell(title, body, actions) {
   const dlg = h('dialog', { class: 'dlg' }, h('h2', null, title), body, h('div', { class: 'dlg-actions' }, actions));
   document.body.append(dlg);
   dlg.addEventListener('close', () => setTimeout(() => dlg.remove(), 0));

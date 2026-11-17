@@ -694,6 +694,35 @@ html:not(.doc-blur) .write.is-empty.is-target:focus-within::after {
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
+.export-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.export-formats {
+  display: flex;
+}
+.export-formats button {
+  flex: 1;
+}
+.export-hint {
+  min-height: 2.9em;
+  margin: 0;
+  color: var(--graphite);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.export-tr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.export-tr input {
+  margin: 0;
+  accent-color: var(--ink);
+}
 .ai-help {
   margin: -4px 0 0;
   color: var(--graphite);

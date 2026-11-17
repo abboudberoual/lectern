@@ -914,3 +914,16 @@ body.resizing * {
 .ask-send.visible {
   visibility: visible;
 }
+.sync-notice {
+  align-self: flex-start;
+  margin: 4px 0 0;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--hl-wash);
+  font-size: 12.5px;
+}
+.sync-notice .linkish {
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

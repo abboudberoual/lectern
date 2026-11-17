@@ -6,7 +6,8 @@ Needs Playwright (`pip install playwright && playwright install chromium`) and p
 listen on 127.0.0.1:443. The mock server is started automatically if it isn't already running.
 Screenshots land in tests/.out/shots.
 """
-import json, os, re, shutil, sys, time, traceback
+import json, os, re, shutil, sys, time, traceback, zipfile
+from xml.dom import minidom
 from playwright.sync_api import sync_playwright
 from harness import EXT, OUT, build_test_ext, ensure_mock_server, launch
 
@@ -51,7 +52,8 @@ def real_manifest_checks(p):
         base = f"chrome-extension://{sw.url.split('/')[2]}"
         m = sw.evaluate("chrome.runtime.getManifest()")
         check("installs with access to youtube.com only", m["host_permissions"] == ["https://www.youtube.com/*"], json.dumps(m["host_permissions"]))
-        check("Ask's hosts are optional", sorted(m.get("optional_host_permissions", [])) == ["https://api.anthropic.com/*", "https://api.openai.com/*"])
+        check("Ask's and Notion's hosts are optional", sorted(m.get("optional_host_permissions", [])) == ["https://api.anthropic.com/*", "https://api.openai.com/*", "https://mcp.notion.com/*"])
+        check("no access to Notion until it's connected", sw.evaluate("chrome.permissions.contains({origins: ['https://mcp.notion.com/*']})") is False)
         granted = sw.evaluate("chrome.permissions.contains({origins: ['https://api.anthropic.com/*']})")
         check("no access to Anthropic until a key is connected", granted is False)
         # a key saved without access (e.g. access removed in chrome://extensions): Ask asks for it
@@ -721,6 +723,139 @@ with sync_playwright() as p:
         )
         check("markdown export has linked timestamps", "[0:20](https://www.youtube.com/watch?v=AAAAAAAAAAA&t=20s)" in md, md[:300])
         check("markdown export includes notepad pages", "## Notepad" in md and "### Ideas" in md and "XOR" in md, md[-300:])
+
+        # ---------- export: Word, Markdown, PDF
+        lib.goto(f"{base}/src/library/library.html?video=AAAAAAAAAAA")
+        lib.wait_for_selector("button[aria-label='More actions']")
+
+        def export(fmt, transcript=False, menu_btn="button[aria-label='More actions']"):
+            lib.click(menu_btn)
+            lib.click(".menu button:has-text('Export…')")
+            lib.click(f".export-formats button[data-id={fmt}]")
+            if transcript:
+                lib.check(".export-tr input")
+            if fmt == "pdf":
+                with ctx.expect_page() as pg:
+                    lib.click(".export-dlg .btn.primary")
+                return pg.value
+            with lib.expect_download() as dl:
+                lib.click(".export-dlg .btn.primary")
+            return dl.value
+
+        d = export("docx", transcript=True)
+        z = zipfile.ZipFile(d.path())
+        names = z.namelist()
+        try:
+            for n in names:
+                if n.endswith((".xml", ".rels")):
+                    minidom.parseString(z.read(n))
+            parsed = True
+        except Exception as e:
+            parsed = str(e)
+        doc = z.read("word/document.xml").decode()
+        rels = z.read("word/_rels/document.xml.rels").decode()
+        check("Word export is a valid .docx", d.suggested_filename.endswith(".docx") and parsed is True and "word/numbering.xml" in names, f"{d.suggested_filename} {parsed}")
+        check("Word export has time notes, notepad pages and the transcript", 'w:val="Title"' in doc and "XOR" in doc and "gradient descent nudges every weight" in doc, doc[:300])
+        check("Word export links each time to that moment", "watch?v=AAAAAAAAAAA&amp;t=20s" in rels and 'w:rStyle w:val="TimeLink"' in doc)
+        check("Word export turns **bold** from saved answers into bold text", "<w:b/>" in doc and "**Summary" not in doc)
+        d = export("md")
+        md_txt = open(d.path()).read()
+        check("Markdown export from the dialog", d.suggested_filename.endswith(".md") and "## Time notes" in md_txt and "## Transcript" not in md_txt)
+        pdf = export("pdf", transcript=True)
+        pdf.wait_for_selector("main h1", timeout=8000)
+        check("PDF export opens a print-ready page", "print.html?video=AAAAAAAAAAA&transcript=1" in pdf.url and pdf.locator("main a.ts").count() >= 5 and pdf.title().startswith("Neural networks"), pdf.url)
+        pdf.screenshot(path=f"{SHOTS}/20-print-page.png", full_page=True)
+        pdf.close()
+        fid = lib.evaluate("chrome.storage.local.get('v:AAAAAAAAAAA').then(r => r['v:AAAAAAAAAAA'].folderId)")
+        if fid:
+            lib.goto(f"{base}/src/library/library.html?folder={fid}")
+            lib.wait_for_selector("button[aria-label='Folder actions']")
+            d = export("docx", menu_btn="button[aria-label='Folder actions']")
+            fdoc = zipfile.ZipFile(d.path()).read("word/document.xml").decode()
+            check("folder export puts every video in one document", "Neural networks" in fdoc and fdoc.count('w:val="Heading1"') >= 1, d.suggested_filename)
+        else:
+            check("folder export puts every video in one document", False, "video A has no folder")
+
+        # ---------- folder sync (the origin-private file system stands in for a picked folder)
+        def vault_files():
+            return lib.evaluate("""async () => {
+              const out = [];
+              const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('vault', { create: true });
+              async function walk(d, pre) { for await (const [n, h] of d.entries()) h.kind === 'directory' ? await walk(h, pre + n + '/') : out.push(pre + n); }
+              await walk(root, '');
+              return out.sort();
+            }""")
+
+        def vault_read(path):
+            return lib.evaluate("""async (path) => {
+              let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('vault');
+              const parts = path.split('/');
+              for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
+              return (await (await d.getFileHandle(parts[parts.length - 1])).getFile()).text();
+            }""", path)
+
+        def edit_video(js):
+            sw.evaluate("""chrome.storage.local.get('v:AAAAAAAAAAA').then(r => { const v = r['v:AAAAAAAAAAA']; (%s)(v); v.updatedAt = Date.now(); return chrome.storage.local.set({'v:AAAAAAAAAAA': v}); })""" % js)
+
+        lib.goto(f"{base}/src/library/library.html")
+        lib.wait_for_selector(".tree-row")
+        lib.evaluate("window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('vault', { create: true })")
+        lib.click("#settingsBtn")
+        lib.click("[data-target=folder] button:has-text('Choose folder')")
+        ok = wait_until(lambda: "Writing to “vault/Lectern”" in lib.inner_text("[data-target=folder] .sync-status"), 8)
+        check("folder sync starts once a folder is chosen", ok, lib.inner_text("[data-target=folder]"))
+        files = vault_files()
+        check("one Markdown file per video, in folders like the library", len(files) == 5 and all(f.startswith("Lectern/") and f.endswith(".md") for f in files), files)
+        a_path = next((f for f in files if "Neural networks" in f), "")
+        a_text = vault_read(a_path) if a_path else ""
+        check("synced files have frontmatter, linked times and the one-way note", a_text.startswith('---\ntitle: "Neural networks') and "[0:20](" in a_text and "Synced from Lectern" in a_text, a_text[:200])
+        edit_video("v => v.notes.push({ id: 'syncmark', t: 33, text: 'Folder sync marker', createdAt: Date.now(), updatedAt: Date.now() })")
+        ok = wait_until(lambda: "Folder sync marker" in vault_read(a_path), 8)
+        check("editing notes rewrites the synced file", ok)
+        edit_video("v => { v._folder = v.folderId; v.folderId = null; }")
+        ok = wait_until(lambda: any(f.startswith("Lectern/Unfiled/Neural") for f in vault_files()) and a_path not in vault_files(), 8)
+        check("moving a video moves its file", ok, vault_files())
+        edit_video("v => { v.folderId = v._folder; delete v._folder; }")
+        wait_until(lambda: a_path in vault_files(), 8)
+
+        # ---------- Notion sync through the mock Notion MCP server
+        def notion_state():
+            return json.loads(lib.evaluate("fetch('https://mcp.notion.com/__notion').then(r => r.text())"))
+
+        lib.click("[data-target=notion] button:has-text('Connect Notion')")
+        ok = wait_until(lambda: "Syncing to the “Lectern” page" in lib.inner_text("[data-target=notion] .sync-status"), 25)
+        check("Notion connects and finishes the first sync", ok, lib.inner_text("[data-target=notion]"))
+        ns = notion_state()
+        tr = ns["token_requests"][0] if ns["token_requests"] else {}
+        check("Notion sign-in uses PKCE and the MCP resource", tr.get("grant_type") == "authorization_code" and len(tr.get("code_verifier", "")) >= 43 and tr.get("resource") == "https://mcp.notion.com/mcp", tr)
+        pages = ns["pages"]
+        root = [p for p in pages.values() if p["title"] == "Lectern" and p["parent"] is None]
+        vids = [p for p in pages.values() if p["title"] and p["parent"] and "Synced from Lectern" in p["content"]]
+        root_id = root[0]["id"] if root else None
+        folder_pages = {k for k, p in pages.items() if k != root_id and "Synced from Lectern" not in p["content"]}
+
+        def reaches_root(k, hops=0):
+            parent = pages[k]["parent"]
+            return parent == root_id or (parent in folder_pages and hops < 10 and reaches_root(parent, hops + 1))
+        check("Notion gets a Lectern page, a page per folder and one per video", len(root) == 1 and folder_pages and len(vids) == 5 and all(p["parent"] in folder_pages or p["parent"] == root_id for p in vids) and all(reaches_root(k) for k in folder_pages), [(p["title"], p["parent"]) for p in pages.values()])
+        a_page = next((p for p in vids if p["title"].startswith("Neural networks")), None)
+        check("a video's Notion page has its notes, without repeating the title", a_page and "[0:20](" in a_page["content"] and "Folder sync marker" in a_page["content"] and not a_page["content"].startswith("# "), (a_page or {}).get("content", "")[:200])
+        edit_video("v => v.notes.push({ id: 'notionmark', t: 44, text: 'Notion sync marker', createdAt: Date.now(), updatedAt: Date.now() })")
+        lib.click("[data-target=notion] button:has-text('Sync now')")
+        ok = wait_until(lambda: any(c["name"] == "notion-update-page" and c["args"].get("command") == "replace_content" and "Notion sync marker" in c["args"].get("new_str", "") for c in notion_state()["calls"]), 10)
+        check("changed notes replace the Notion page's content", ok)
+        edit_video("v => { v.title = 'Gradient descent, renamed' }")
+        ok = wait_until(lambda: any(p["title"] == "Gradient descent, renamed" for p in notion_state()["pages"].values()), 20)
+        check("Notion follows changes on its own, a few seconds later", ok)
+        backup_keys = lib.evaluate("import('../shared/db.js').then(d => d.exportAll()).then(b => Object.keys(b.data))")
+        check("backups leave out the Notion sign-in and folder sync state", "nsync" not in backup_keys and "fsync" not in backup_keys)
+        lib.screenshot(path=f"{SHOTS}/21-settings-sync.png", full_page=True)
+        lib.click("[data-target=notion] button:has-text('Disconnect')")
+        lib.click("dialog.dlg:not(.settings) .btn.danger")
+        ok = wait_until(lambda: "Connect Notion" in lib.inner_text("[data-target=notion]"), 5)
+        check("disconnecting Notion forgets the sign-in", ok and not lib.evaluate("chrome.storage.local.get('nsync').then(r => !!(r.nsync && r.nsync.auth))"))
+        lib.click("dialog.settings .btn.primary:has-text('Done')")
+        edit_video("v => { v.title = 'Neural networks: how gradient descent learns' }")
 
         # empty panel state (non-YouTube tab)
         other = ctx.new_page()

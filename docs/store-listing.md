@@ -40,6 +40,7 @@ WHAT MAKES IT DIFFERENT
 • Two kinds of notes. Time notes are stamped with the video time when you save them. A notepad with pages holds the ideas that aren't tied to one moment.
 • The transcript stays with the video. Saved automatically, searchable alongside your notes, and every line jumps to its moment.
 • Bring your own AI, or none. Ask Claude or OpenAI about the whole video or one moment with your own API key. Answers cite times you can click. Everything else works without it.
+• Your notes go where you keep notes. Keep a synced copy in Obsidian (or any Markdown folder) or Notion, and export any video or folder as Markdown, Word or PDF.
 
 HOW IT WORKS
 
@@ -65,15 +66,17 @@ Lectern is not affiliated with YouTube, Google, Anthropic or OpenAI.
 - `sidePanel`: the notes panel shown beside the video.
 - `scripting`: injects the transcript reader into the YouTube tab when the user saves a video or clicks Get transcript, and into YouTube tabs already open when the extension is installed.
 - `contextMenus`: the "Open library" item on the toolbar icon's menu.
+- `identity`: shows Notion's own sign-in page in a window when the user clicks Connect Notion (chrome.identity.launchWebAuthFlow), and returns them to Lectern. Used only for the optional Notion sync.
 - Host `https://www.youtube.com/*`: reads the current video time, jumps to timestamps, adds a note button to the player, and reads captions.
 - Optional hosts `https://api.anthropic.com/*`, `https://api.openai.com/*`: not granted at install. Requested only when the user connects their own API key for the optional Ask feature, to send their question with the video's transcript and their notes. Released when they remove the key.
+- Optional host `https://mcp.notion.com/*`: not granted at install. Requested only when the user clicks Connect Notion, to sign in with Notion and write their notes to pages in their own Notion workspace through Notion's MCP server. Released when they disconnect.
 
 **Remote code:** No. All code is in the package.
 
 **Data usage** (my reading of the form; check its current wording):
 
-- Authentication information: yes. The user's own API key, stored locally and sent only to the provider it belongs to.
-- Website content: yes. Video transcripts, stored locally and sent to the user's chosen AI provider only when they use Ask.
+- Authentication information: yes. The user's own API key, stored locally and sent only to the provider it belongs to; and, if they connect Notion, Notion's sign-in token, stored locally and sent only to Notion.
+- Website content: yes. Video transcripts, stored locally; sent to the user's chosen AI provider when they use Ask, and to their Notion workspace if they connect Notion and turn on "Include transcripts".
 - Everything else: no.
 - Certify all three: not sold to third parties; not used or transferred for purposes unrelated to the single purpose; not used to determine creditworthiness or for lending.
 

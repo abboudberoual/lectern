@@ -311,6 +311,8 @@ export async function deleteTranscript(videoId) {
 export async function exportAll() {
   const all = await store.get(null);
   delete all.ai; // the Ask API key stays on this computer
+  delete all.nsync; // so does the Notion sign-in
+  delete all.fsync; // and which files this computer has synced
   return { app: 'lectern', version: 1, exportedAt: new Date().toISOString(), data: all };
 }
 
