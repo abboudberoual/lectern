@@ -1060,3 +1060,18 @@ body {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.set-sync.flash .sync-target {
+  animation: sync-flash 1.6s ease-out;
+}
+@keyframes sync-flash {
+  0%,
+  35% {
+    border-color: var(--ink);
+    background: var(--hl-wash);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .set-sync.flash .sync-target {
+    animation: none;
+  }
+}

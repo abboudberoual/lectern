@@ -480,6 +480,7 @@ vMenuBtn.addEventListener('click', () => {
   if (v) items.push({ label: 'Show in library', icon: 'books', onClick: () => openLibrary(`video=${S.videoId}`) });
   items.push({ label: 'Copy notes as Markdown', icon: 'copy', onClick: copyMarkdown });
   if (v) items.push({ label: 'Export…', icon: 'download', onClick: exportVideoNotes });
+  items.push({ label: 'Sync to Notion or Obsidian…', icon: 'refresh', onClick: () => openLibrary('settings=sync') });
   if (v) {
     items.push({ label: v.done ? 'Mark as not finished' : 'Mark as finished', icon: 'check', onClick: toggleDone });
     items.push('sep', { label: 'Remove from library', icon: 'trash', danger: true, onClick: removeVideo });

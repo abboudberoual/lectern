@@ -857,6 +857,16 @@ with sync_playwright() as p:
         lib.click("dialog.settings .btn.primary:has-text('Done')")
         edit_video("v => { v.title = 'Neural networks: how gradient descent learns' }")
 
+        # the panel's menu leads straight to the Sync settings
+        panel.bring_to_front()
+        panel.click("button[aria-label='More actions for this video']")
+        panel.click(".menu button:has-text('Sync to Notion or Obsidian')")
+        ok = wait_until(lambda: lib.locator("dialog.settings .set-sync [data-target=notion]").count() == 1 and "settings=" not in lib.url, 8)
+        check("the panel's Sync item opens Settings at Sync", ok, lib.url)
+        if ok:
+            lib.bring_to_front()  # background tabs don't paint, so clicks there never settle
+            lib.click("dialog.settings .btn.primary:has-text('Done')")
+
         # empty panel state (non-YouTube tab)
         other = ctx.new_page()
         other.goto("https://www.youtube.com/feed/subscriptions")

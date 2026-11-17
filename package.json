@@ -1,6 +1,6 @@
 {
   "name": "lectern",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Timestamped notes, transcripts and topic folders for the YouTube videos you learn from.",
   "license": "MIT",

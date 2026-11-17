@@ -1162,7 +1162,7 @@ document.addEventListener('keydown', (e) => {
 
 // ---------------------------------------------------------------- settings & backup
 
-document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('settingsBtn').addEventListener('click', () => openSettings());
 const importFile = document.getElementById('importFile');
 
 async function exportBackup() {
@@ -1171,7 +1171,7 @@ async function exportBackup() {
   downloadText(`lectern-backup-${day}.json`, JSON.stringify(data), 'application/json');
 }
 
-async function openSettings() {
+async function openSettings(focus) {
   const s = L.settings;
   const askSection = h(
     'div',
@@ -1248,6 +1248,11 @@ async function openSettings() {
     dlg.remove();
   });
   dlg.showModal();
+  if (focus === 'sync') {
+    syncSection.scrollIntoView({ block: 'start' });
+    syncSection.classList.add('flash');
+    setTimeout(() => syncSection.classList.remove('flash'), 1600);
+  }
 }
 
 importFile.addEventListener('change', async () => {
@@ -1346,5 +1351,13 @@ async function boot() {
   await render();
   startFolderSync({ onStatus: (r) => (syncPaused.hidden = r !== 'paused') });
   folderSyncStatus().then((s) => (syncPaused.hidden = s.state !== 'paused'));
+  // ?settings=sync (from the panel's menu) opens Settings at that section
+  const params = new URLSearchParams(location.search);
+  if (params.has('settings')) {
+    const focus = params.get('settings');
+    params.delete('settings');
+    history.replaceState(history.state, '', location.pathname + (params.toString() ? `?${params}` : ''));
+    openSettings(focus);
+  }
 }
 boot();
