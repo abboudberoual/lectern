@@ -246,6 +246,20 @@
   window.addEventListener('popstate', onNavigate);
   setInterval(onNavigate, 1000);
 
+  // ---------- opening the panel on its own (a setting) ----------
+  // Chrome only opens a side panel in response to something the person does, so with the
+  // setting on, the first click or key press on a video's page opens it, once per video.
+  let autoOpenedFor = null;
+  function maybeAutoOpen(e) {
+    if (!e.isTrusted || !alive() || !settings.autoOpenPanel) return;
+    const id = currentVideoId();
+    if (!id || autoOpenedFor === id) return;
+    autoOpenedFor = id;
+    chrome.runtime.sendMessage({ type: 'autoOpenPanel', videoId: id }).catch(() => {});
+  }
+  window.addEventListener('pointerdown', maybeAutoOpen, true);
+  window.addEventListener('keydown', maybeAutoOpen, true);
+
   refreshSaved().then(() => setTimeout(maybeAutoCapture, 4000));
 
   // ---------- player button ----------

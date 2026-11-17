@@ -167,6 +167,15 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return;
   }
 
+  if (msg.type === 'autoOpenPanel' && sender.tab) {
+    // The "open the panel when I watch a video" setting. Like the note button, this must run
+    // synchronously inside the click or key press that sent it.
+    chrome.sidePanel.open({ windowId: sender.tab.windowId }).catch(() => {});
+    chrome.storage.session.set({ lastAutoOpen: { tabId: sender.tab.id, videoId: msg.videoId, at: Date.now() } }).catch(() => {});
+    reply({ ok: true });
+    return;
+  }
+
   if (msg.type === 'autoCapture' && sender.tab) {
     captureTranscript(sender.tab.id, msg.videoId, { auto: true });
     reply({ ok: true });

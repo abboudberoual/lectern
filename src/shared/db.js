@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   pauseWhileTyping: false, // pause the video when you start writing a note
   leadSeconds: 0, // stamp notes this many seconds before the moment you start typing
   openPanelFromLibrary: true, // open the notes panel when opening a video from the library
+  autoOpenPanel: false, // open the notes panel on the first click or key press on a video's page
   followTranscript: true, // keep the current transcript line in view
 };
 

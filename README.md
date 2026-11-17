@@ -54,7 +54,7 @@ Alt+J, Alt+K and Alt+L rewind 5 seconds, play/pause and skip 5 seconds while you
 - A video's page shows its time notes and notepad next to the transcript.
 - Search (press `/`) looks through titles, notes, notepad pages and transcripts at once.
 
-**Settings** are at the bottom of the library sidebar: automatic transcripts, pausing the video while you write, stamping notes a few seconds early, appearance, Ask, sync, and backup.
+**Settings** are at the bottom of the library sidebar: automatic transcripts, pausing the video while you write, stamping notes a few seconds early, opening the panel whenever you watch a video, appearance, Ask, sync, and backup. Chrome only opens the panel after you do something on the page, so that setting opens it on your first click or key press on each video (usually when you press play).
 
 ## Export and sync
 

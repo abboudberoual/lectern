@@ -1210,6 +1210,11 @@ async function openSettings(focus) {
     toggle('autoTranscript', 'Get transcripts automatically', 'When a video is saved, its captions are saved with it.'),
     toggle('pauseWhileTyping', 'Pause the video while I write a note', 'It plays again when you save the note.'),
     toggle('openPanelFromLibrary', 'Open the notes panel when I open a video from here'),
+    toggle(
+      'autoOpenPanel',
+      'Open the notes panel when I watch a video',
+      'Chrome only lets extensions open the panel after you do something on the page, so it opens the first time you click or press a key on each video.'
+    ),
     h('label', { class: 'set-field' }, h('strong', null, 'Note timestamps'), lead),
     h('label', { class: 'set-field' }, h('strong', null, 'Appearance'), theme),
     askSection,

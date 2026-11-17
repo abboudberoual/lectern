@@ -874,6 +874,31 @@ with sync_playwright() as p:
             # close it directly: a click in a background tab never counts as settled, since nothing paints there
             target.evaluate("document.querySelector('dialog.settings').close()")
 
+        # ---------- "open the panel when I watch a video"
+        def last_auto_open():
+            return sw.evaluate("chrome.storage.session.get('lastAutoOpen').then(r => r.lastAutoOpen || null)")
+
+        def set_auto_open(on):
+            sw.evaluate("chrome.storage.local.get('settings').then(r => chrome.storage.local.set({settings: {...(r.settings || {}), autoOpenPanel: %s}}))" % ("true" if on else "false"))
+            time.sleep(0.5)
+
+        sw.evaluate("chrome.storage.session.remove('lastAutoOpen')")
+        set_auto_open(False)
+        yt.bring_to_front()
+        yt.mouse.click(8, 400)
+        time.sleep(0.8)
+        check("with the setting off, clicking a video's page leaves the panel alone", last_auto_open() is None)
+        set_auto_open(True)
+        yt.mouse.click(8, 400)
+        first = wait_until(last_auto_open, 4)
+        vid_now = (re.search(r"v=([\w-]{11})", yt.url) or [None, None])[1]
+        check("with it on, the first click on a video's page opens the panel", bool(first) and first.get("videoId") == vid_now, (first, vid_now))
+        yt.mouse.click(10, 402)
+        yt.keyboard.press("ArrowRight")
+        time.sleep(0.8)
+        check("…once per video, not on every click", bool(first) and (last_auto_open() or {}).get("at") == first.get("at"))
+        set_auto_open(False)
+
         # empty panel state (non-YouTube tab)
         other = ctx.new_page()
         other.goto("https://www.youtube.com/feed/subscriptions")
