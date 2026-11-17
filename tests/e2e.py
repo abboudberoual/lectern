@@ -871,8 +871,8 @@ with sync_playwright() as p:
         target = wait_until(library_with_sync, 8)
         check("the panel's Sync item opens Settings at Sync", bool(target), [pg.url for pg in ctx.pages if "library.html" in pg.url])
         if target:
-            target.bring_to_front()  # background tabs don't paint, so clicks there never settle
-            target.click("dialog.settings .btn.primary:has-text('Done')")
+            # close it directly: a click in a background tab never counts as settled, since nothing paints there
+            target.evaluate("document.querySelector('dialog.settings').close()")
 
         # empty panel state (non-YouTube tab)
         other = ctx.new_page()
