@@ -9,12 +9,12 @@ Copy for the store dashboard. Keep "YouTube" out of the name: YouTube's branding
 - [ ] Bump the version if anything changed during testing, then publish a release (Releases → Draft a new release → tag `v1.0.0`). The Release workflow attaches `lectern-<version>.zip`: that is the file to upload.
 - [x] Icon without a play triangle (`scripts/make_icons.py`).
 - [x] Install asks for youtube.com only; the Anthropic and OpenAI hosts are optional and requested when someone connects a key.
-- [x] Screenshots and promo tile in `docs/store/` (regenerate with `python3 tests/screenshots.py`).
+- [x] Screenshots and promo tile in `docs/store/`, made from real screenshots in `docs/store/source/` (regenerate with `python3 scripts/store_images.py`).
 
 ## Images
 
 - Store icon: `icons/icon128.png` (96 px artwork with 16 px transparent padding, as the store asks)
-- Screenshots, 1280×800, in this order: `docs/store/1-notes.png`, `2-folders.png`, `3-ask.png`, `4-transcript.png`, `5-search.png`
+- Screenshots, 1280×800, in this order: `docs/store/1-notes.png`, `2-folders.png`, `3-ask.png`, `4-transcript.png`, `5-notion.png`
 - Small promo tile, 440×280: `docs/store/promo-440x280.png`
 
 ## Name
